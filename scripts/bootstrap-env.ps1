@@ -75,6 +75,27 @@ function Get-OldDefaultProxyConfigDir {
   return ($home.TrimEnd("/") + "/.local/state/wpdraft/proxy/dynamic")
 }
 
+function Test-SafePathExists([string]$Path) {
+  try {
+    return Test-Path $Path
+  }
+  catch {
+    return $false
+  }
+}
+
+function Test-ExampleProxyConfigDir([string]$Path) {
+  if ([string]::IsNullOrWhiteSpace($Path)) {
+    return $false
+  }
+
+  $normalized = (($Path -replace "\\", "/") -replace "/{2,}", "/").TrimEnd("/")
+  return $normalized -in @(
+    "C:/Users/you/AppData/Local/pressyard/proxy/dynamic",
+    "C:/Users/you/AppData/Local/wpdraft/proxy/dynamic"
+  )
+}
+
 $root = Resolve-Path (Join-Path $PSScriptRoot "..")
 $envPath = Join-Path $root ".env"
 $examplePath = Join-Path $root ".env.example"
@@ -156,7 +177,7 @@ function Test-HostNameReserved([string]$hostName, [string]$configDir, [string]$c
     return $true
   }
 
-  if ([string]::IsNullOrWhiteSpace($configDir) -or -not (Test-Path $configDir)) {
+  if ([string]::IsNullOrWhiteSpace($configDir) -or -not (Test-SafePathExists $configDir)) {
     return $false
   }
 
@@ -279,7 +300,11 @@ if (-not $settings.ContainsKey("PROXY_CONFIG_DIR") -or [string]::IsNullOrWhiteSp
 }
 else {
   $settings["PROXY_CONFIG_DIR"] = (($settings["PROXY_CONFIG_DIR"] -replace "\\", "/") -replace "/{2,}", "/")
-  if ($settings["PROXY_CONFIG_DIR"] -eq (Get-OldDefaultProxyConfigDir) -or $settings["PROXY_CONFIG_DIR"] -match "/wpdraft/proxy/dynamic/?$") {
+  if (
+    (Test-ExampleProxyConfigDir $settings["PROXY_CONFIG_DIR"]) -or
+    $settings["PROXY_CONFIG_DIR"] -eq (Get-OldDefaultProxyConfigDir) -or
+    $settings["PROXY_CONFIG_DIR"] -match "/wpdraft/proxy/dynamic/?$"
+  ) {
     $settings["PROXY_CONFIG_DIR"] = Get-DefaultProxyConfigDir
   }
 }
