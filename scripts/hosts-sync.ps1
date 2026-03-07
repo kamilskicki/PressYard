@@ -1,5 +1,6 @@
 param(
   [switch]$WithTools,
+  [switch]$WithMail,
   [switch]$Remove,
   [switch]$Quiet
 )
@@ -70,11 +71,14 @@ function Remove-ManagedBlock([string[]]$Lines, [string]$BeginMarker, [string]$En
   return ,$result
 }
 
-function Get-EntryLines([string]$HostName, [switch]$WithTools) {
+function Get-EntryLines([string]$HostName, [switch]$WithTools, [switch]$WithMail) {
   $entries = New-Object System.Collections.Generic.List[string]
   $entries.Add(("127.0.0.1 {0}" -f $HostName))
   if ($WithTools) {
     $entries.Add(("127.0.0.1 db-{0}" -f $HostName))
+  }
+  if ($WithMail) {
+    $entries.Add(("127.0.0.1 mail-{0}" -f $HostName))
   }
   return ,$entries
 }
@@ -133,7 +137,7 @@ if (-not $Remove) {
   }
 
   $cleanLines.Add($beginMarker)
-  foreach ($entry in Get-EntryLines -HostName $hostName -WithTools:$WithTools) {
+  foreach ($entry in Get-EntryLines -HostName $hostName -WithTools:$WithTools -WithMail:$WithMail) {
     $cleanLines.Add($entry)
   }
   $cleanLines.Add($endMarker)

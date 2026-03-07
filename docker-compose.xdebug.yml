@@ -1,0 +1,15 @@
+services:
+  wordpress:
+    build:
+      context: .
+      dockerfile: docker/wordpress-xdebug/Dockerfile
+    image: pressyard-wordpress-xdebug:php8.2
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    environment:
+      XDEBUG_MODE: ${XDEBUG_MODE:-debug,develop}
+      XDEBUG_CLIENT_HOST: ${XDEBUG_CLIENT_HOST:-host.docker.internal}
+      XDEBUG_CLIENT_PORT: ${XDEBUG_CLIENT_PORT:-9003}
+      XDEBUG_IDE_KEY: ${XDEBUG_IDE_KEY:-VSCODE}
+      XDEBUG_START_WITH_REQUEST: ${XDEBUG_START_WITH_REQUEST:-yes}
+      PHP_IDE_CONFIG: serverName=${WP_HOSTNAME:-pressyard.localhost}

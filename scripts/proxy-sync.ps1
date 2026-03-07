@@ -1,5 +1,6 @@
 param(
   [switch]$WithTools,
+  [switch]$WithMail,
   [switch]$Remove
 )
 
@@ -55,6 +56,14 @@ if ($WithTools) {
   $lines.Add(("      service: ""{0}-adminer""" -f $projectName))
 }
 
+if ($WithMail) {
+  $lines.Add("    $projectName-mailpit:")
+  $lines.Add("      entryPoints:")
+  $lines.Add("        - web")
+  $lines.Add(('      rule: "Host(`mail-' + $settings["WP_HOSTNAME"] + '`)"'))
+  $lines.Add(("      service: ""{0}-mailpit""" -f $projectName))
+}
+
 $lines.Add("  services:")
 $lines.Add("    $projectName-site:")
 $lines.Add("      loadBalancer:")
@@ -66,6 +75,13 @@ if ($WithTools) {
   $lines.Add("      loadBalancer:")
   $lines.Add("        servers:")
   $lines.Add(("          - url: ""http://host.docker.internal:{0}""" -f $settings["ADMINER_PUBLISHED_PORT"]))
+}
+
+if ($WithMail) {
+  $lines.Add("    $projectName-mailpit:")
+  $lines.Add("      loadBalancer:")
+  $lines.Add("        servers:")
+  $lines.Add(("          - url: ""http://host.docker.internal:{0}""" -f $settings["MAILPIT_PUBLISHED_PORT"]))
 }
 
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)

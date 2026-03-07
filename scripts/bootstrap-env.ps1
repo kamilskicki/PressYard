@@ -354,6 +354,38 @@ if (-not $settings.ContainsKey("ADMINER_IMAGE") -or [string]::IsNullOrWhiteSpace
   $settings["ADMINER_IMAGE"] = "adminer:4.8.1-standalone"
 }
 
+if (-not $settings.ContainsKey("MAILPIT_IMAGE") -or [string]::IsNullOrWhiteSpace($settings["MAILPIT_IMAGE"])) {
+  $settings["MAILPIT_IMAGE"] = "axllent/mailpit:v1.29.2"
+}
+
+if (-not $settings.ContainsKey("ENABLE_MAILPIT") -or [string]::IsNullOrWhiteSpace($settings["ENABLE_MAILPIT"])) {
+  $settings["ENABLE_MAILPIT"] = "false"
+}
+
+if (-not $settings.ContainsKey("ENABLE_XDEBUG") -or [string]::IsNullOrWhiteSpace($settings["ENABLE_XDEBUG"])) {
+  $settings["ENABLE_XDEBUG"] = "false"
+}
+
+if (-not $settings.ContainsKey("XDEBUG_MODE") -or [string]::IsNullOrWhiteSpace($settings["XDEBUG_MODE"])) {
+  $settings["XDEBUG_MODE"] = "debug,develop"
+}
+
+if (-not $settings.ContainsKey("XDEBUG_CLIENT_HOST") -or [string]::IsNullOrWhiteSpace($settings["XDEBUG_CLIENT_HOST"])) {
+  $settings["XDEBUG_CLIENT_HOST"] = "host.docker.internal"
+}
+
+if (-not $settings.ContainsKey("XDEBUG_CLIENT_PORT") -or [string]::IsNullOrWhiteSpace($settings["XDEBUG_CLIENT_PORT"])) {
+  $settings["XDEBUG_CLIENT_PORT"] = "9003"
+}
+
+if (-not $settings.ContainsKey("XDEBUG_IDE_KEY") -or [string]::IsNullOrWhiteSpace($settings["XDEBUG_IDE_KEY"])) {
+  $settings["XDEBUG_IDE_KEY"] = "VSCODE"
+}
+
+if (-not $settings.ContainsKey("XDEBUG_START_WITH_REQUEST") -or [string]::IsNullOrWhiteSpace($settings["XDEBUG_START_WITH_REQUEST"])) {
+  $settings["XDEBUG_START_WITH_REQUEST"] = "yes"
+}
+
 $autoHostname = $true
 if ($settings.ContainsKey("AUTO_HOSTNAME")) {
   $autoHostname = Is-True $settings["AUTO_HOSTNAME"]
@@ -410,6 +442,33 @@ if ($autoAdminerPort -or -not $settings.ContainsKey("ADMINER_PUBLISHED_PORT") -o
   }
 }
 
+$autoMailpitPort = $true
+if ($settings.ContainsKey("AUTO_MAILPIT_PORT")) {
+  $autoMailpitPort = Is-True $settings["AUTO_MAILPIT_PORT"]
+}
+if ($autoMailpitPort -or -not $settings.ContainsKey("MAILPIT_PUBLISHED_PORT") -or [string]::IsNullOrWhiteSpace($settings["MAILPIT_PUBLISHED_PORT"])) {
+  $keepCurrentMailpitPort = $false
+  if ($settings.ContainsKey("MAILPIT_PUBLISHED_PORT")) {
+    $currentMailpitPort = 0
+    if ([int]::TryParse($settings["MAILPIT_PUBLISHED_PORT"], [ref]$currentMailpitPort)) {
+      if ((Test-PortAvailable $currentMailpitPort) -or (Test-PortBoundByProject -port $currentMailpitPort -projectName $settings["COMPOSE_PROJECT_NAME"])) {
+        $keepCurrentMailpitPort = $true
+      }
+    }
+  }
+
+  if (-not $keepCurrentMailpitPort) {
+    $mailpitSeed = [Convert]::ToUInt32($hashHex.Substring(16, 8), 16)
+    $mailpitPort = Find-AvailablePort -seed $mailpitSeed -minPort 10000 -maxPort 59999
+    foreach ($reservedPort in @([int]$settings["WORDPRESS_PUBLISHED_PORT"], [int]$settings["ADMINER_PUBLISHED_PORT"])) {
+      if ($mailpitPort -eq $reservedPort) {
+        $mailpitPort = Find-AvailablePort -seed ($mailpitSeed + $reservedPort) -minPort 10000 -maxPort 59999
+      }
+    }
+    $settings["MAILPIT_PUBLISHED_PORT"] = [string]$mailpitPort
+  }
+}
+
 $proxyPort = $settings["PROXY_HTTP_PORT"]
 $proxyPortSuffix = if ($proxyPort -eq "80") { "" } else { ":" + $proxyPort }
 $settings["WP_URL"] = "http://$($settings["WP_HOSTNAME"])$proxyPortSuffix"
@@ -417,6 +476,7 @@ $settings["AUTO_NAMESPACE"] = if ($autoNamespace) { "true" } else { "false" }
 $settings["AUTO_HOSTNAME"] = if ($autoHostname) { "true" } else { "false" }
 $settings["AUTO_PORT"] = if ($autoPort) { "true" } else { "false" }
 $settings["AUTO_ADMINER_PORT"] = if ($autoAdminerPort) { "true" } else { "false" }
+$settings["AUTO_MAILPIT_PORT"] = if ($autoMailpitPort) { "true" } else { "false" }
 
 $orderedKeys = @(
   "COMPOSE_PROJECT_NAME",
@@ -424,6 +484,7 @@ $orderedKeys = @(
   "WORDPRESS_BIND_ADDRESS",
   "WP_HOSTNAME",
   "ADMINER_PUBLISHED_PORT",
+  "MAILPIT_PUBLISHED_PORT",
   "PROXY_PROJECT_NAME",
   "PROXY_BIND_ADDRESS",
   "PROXY_HTTP_PORT",
@@ -435,10 +496,12 @@ $orderedKeys = @(
   "MARIADB_IMAGE",
   "TRAEFIK_IMAGE",
   "ADMINER_IMAGE",
+  "MAILPIT_IMAGE",
   "AUTO_NAMESPACE",
   "AUTO_HOSTNAME",
   "AUTO_PORT",
   "AUTO_ADMINER_PORT",
+  "AUTO_MAILPIT_PORT",
   "MARIADB_ROOT_PASSWORD",
   "WORDPRESS_DB_NAME",
   "WORDPRESS_DB_USER",
@@ -449,7 +512,14 @@ $orderedKeys = @(
   "WP_ADMIN_USER",
   "WP_ADMIN_PASSWORD",
   "WP_ADMIN_EMAIL",
-  "WP_DEBUG"
+  "WP_DEBUG",
+  "ENABLE_MAILPIT",
+  "ENABLE_XDEBUG",
+  "XDEBUG_MODE",
+  "XDEBUG_CLIENT_HOST",
+  "XDEBUG_CLIENT_PORT",
+  "XDEBUG_IDE_KEY",
+  "XDEBUG_START_WITH_REQUEST"
 )
 
 $out = New-Object System.Collections.Generic.List[string]

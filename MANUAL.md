@@ -25,6 +25,7 @@ Main services:
 - `wp-init`
 - `wp-cli` via profile `ops`
 - `adminer` via profile `tools`
+- `mailpit` via profile `mail`
 - shared Traefik proxy from `docker-compose.proxy.yml`
 
 Important paths:
@@ -75,6 +76,7 @@ That fallback is for the internal Docker namespace. Old volumes by themselves no
 ### Default one-command boot
 
 ```powershell
+.\doctor.ps1
 .\up.ps1
 ```
 
@@ -120,6 +122,30 @@ Use:
 - Adminer direct: `http://127.0.0.1:<ADMINER_PUBLISHED_PORT>`
 - Adminer proxy: `http://db-<WP_HOSTNAME>:<PROXY_HTTP_PORT>`
 
+### Direct + router + Mailpit
+
+```powershell
+.\up.ps1 -WithMail
+```
+
+Use:
+
+- Mailpit direct: `http://127.0.0.1:<MAILPIT_PUBLISHED_PORT>`
+- Mailpit proxy: `http://mail-<WP_HOSTNAME>:<PROXY_HTTP_PORT>`
+- `wp_mail()` is routed there automatically
+
+### Xdebug
+
+```powershell
+.\up.ps1 -WithXdebug
+```
+
+Behavior:
+
+- swaps the web container to the Xdebug-enabled image
+- defaults to `host.docker.internal:9003`
+- defaults to `XDEBUG_MODE=debug,develop`
+
 ## 5. Shared Proxy Model
 
 The proxy is intentionally decoupled from Docker discovery.
@@ -140,6 +166,7 @@ Route flow:
 3. Traefik watches that directory
 4. requests for `WP_HOSTNAME` route to `host.docker.internal:<WORDPRESS_PUBLISHED_PORT>`
 5. requests for `db-<WP_HOSTNAME>` route to `host.docker.internal:<ADMINER_PUBLISHED_PORT>`
+6. requests for `mail-<WP_HOSTNAME>` route to `host.docker.internal:<MAILPIT_PUBLISHED_PORT>`
 
 Useful commands:
 
@@ -159,6 +186,8 @@ Useful commands:
 - creation of writable runtime directories used by wp-admin updates
 - deletion of default plugins
 - ZIP package install
+- ZIP plugin activation
+- post-name permalink structure
 - fallback activation of `local-dev-theme`
 - deletion of inactive default `twenty*` themes
 
@@ -177,9 +206,11 @@ Use the wrapper:
 .\wp.ps1 theme list
 .\wp.ps1 option get siteurl
 .\wp.ps1 search-replace old.example new.example --skip-columns=guid
+.\wp.ps1 eval "var_export(wp_mail('dev@example.com','Subject','Body'));"
 ```
 
 `wp-cli` is an on-demand service and does not come up with the default stack.
+If Mailpit is running, `.\wp.ps1` inherits that transport automatically.
 
 ## 8. DB Export and Import
 
@@ -236,6 +267,7 @@ For highest practical throughput when running many stacks:
 - export DB snapshots before risky plugin/theme work
 - only start `adminer` when needed
 - keep personal ZIP bundles in `packages/` so the repo root stays publishable
+- leave Mailpit and Xdebug off unless the current task needs them
 
 ## 11. Common Workflows
 

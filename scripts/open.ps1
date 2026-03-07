@@ -1,5 +1,6 @@
 param(
   [switch]$Adminer,
+  [switch]$Mailpit,
   [switch]$Direct
 )
 
@@ -44,12 +45,24 @@ $root = Resolve-Path (Join-Path $PSScriptRoot "..")
 & (Join-Path $PSScriptRoot "bootstrap-env.ps1") -Quiet
 $settings = Get-EnvSettings (Join-Path $root ".env")
 
-  if ($Adminer) {
+if ($Adminer -and $Mailpit) {
+  throw "Choose only one target: site, Adminer, or Mailpit."
+}
+
+if ($Adminer) {
   if ($Direct) {
     $url = "http://127.0.0.1:{0}" -f $settings["ADMINER_PUBLISHED_PORT"]
   }
   else {
     $url = Format-ProxyUrl -HostName ("db-{0}" -f $settings["WP_HOSTNAME"]) -Port $settings["PROXY_HTTP_PORT"]
+  }
+}
+elseif ($Mailpit) {
+  if ($Direct) {
+    $url = "http://127.0.0.1:{0}" -f $settings["MAILPIT_PUBLISHED_PORT"]
+  }
+  else {
+    $url = Format-ProxyUrl -HostName ("mail-{0}" -f $settings["WP_HOSTNAME"]) -Port $settings["PROXY_HTTP_PORT"]
   }
 }
 else {

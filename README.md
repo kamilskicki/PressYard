@@ -31,16 +31,20 @@ PressYard is designed for the copy-heavy reality of WordPress work:
 
 ## Fast Start
 
-From the repo root:
+Open PowerShell as Administrator, then from the repo root run:
 
 ```powershell
+.\doctor.ps1
 .\up.ps1
 ```
 
-Or with Adminer too:
+Or use one of the optional dev profiles:
 
 ```powershell
 .\up.ps1 -WithTools
+.\up.ps1 -WithMail
+.\up.ps1 -WithXdebug
+.\up.ps1 -WithTools -WithMail -WithXdebug
 ```
 
 That will:
@@ -52,6 +56,8 @@ That will:
 5. start WordPress
 6. start the shared proxy
 7. print the full installation path and live URLs
+
+If you skip the elevated terminal, use `.\up.ps1 -WithProxy:$false` and work on the printed direct port instead.
 
 ## Mental Model
 
@@ -74,12 +80,15 @@ That fallback applies to the internal Docker project namespace only when a live 
 ```powershell
 .\up.ps1
 .\up.ps1 -WithTools
+.\up.ps1 -WithMail
+.\up.ps1 -WithXdebug
 .\down.ps1
 .\down.ps1 -Volumes
 .\wp.ps1 plugin list
 .\logs.ps1 wordpress -Follow
 .\open.ps1
 .\open.ps1 -Adminer
+.\open.ps1 -Mailpit
 .\reset.ps1 -WithTools
 .\doctor.ps1
 .\export-db.ps1
@@ -122,6 +131,19 @@ If the ZIP set has not changed, later boots skip reinstall.
 
 `packages/` is ignored by Git on purpose so personal/commercial plugin bundles stay local.
 
+## Dev Profiles
+
+Optional profiles are intentionally off by default so the fastest path stays fast.
+
+- `-WithTools` starts Adminer
+- `-WithMail` starts Mailpit and routes `wp_mail()` into the local inbox automatically
+- `-WithXdebug` swaps the WordPress web container to the Xdebug-enabled image
+
+You can also persist them in `.env`:
+
+- `ENABLE_MAILPIT=true`
+- `ENABLE_XDEBUG=true`
+
 ## Shared Proxy
 
 By default, `.\up.ps1` starts a shared Traefik instance on:
@@ -144,6 +166,10 @@ You still get the direct published WordPress port.
 
 The proxy is global across all project copies on the machine.
 Its shared Compose project name defaults to `pressyard-proxy`.
+
+When Mailpit is enabled, it also gets a clean proxy URL:
+
+- `http://mail-<project>.localhost`
 
 ## Hostname Resolution
 
@@ -176,6 +202,23 @@ Also supported in principle:
 - Linux + PowerShell 7 + Docker Engine + Compose plugin
 
 The repo intentionally uses PowerShell as the automation layer across platforms instead of maintaining parallel shell implementations.
+
+## Mailpit And Xdebug
+
+Mailpit:
+
+- direct URL: `http://127.0.0.1:<MAILPIT_PUBLISHED_PORT>`
+- proxy URL: `http://mail-<project>.localhost`
+- WordPress mail is routed there automatically through a must-use plugin
+
+Xdebug:
+
+- enabled with `.\up.ps1 -WithXdebug` or `ENABLE_XDEBUG=true`
+- uses `host.docker.internal` by default
+- defaults:
+  - mode: `debug,develop`
+  - port: `9003`
+  - IDE key: `VSCODE`
 
 ## Repo Hygiene
 

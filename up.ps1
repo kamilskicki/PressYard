@@ -1,7 +1,9 @@
 param(
   [switch]$Detached,
   [switch]$WithTools,
-  [switch]$WithProxy
+  [switch]$WithProxy,
+  [switch]$WithMail,
+  [switch]$WithXdebug
 )
 
 Set-StrictMode -Version Latest

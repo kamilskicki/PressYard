@@ -1,7 +1,9 @@
 param(
   [switch]$Detached,
   [switch]$WithTools,
-  [switch]$WithProxy
+  [switch]$WithProxy,
+  [switch]$WithMail,
+  [switch]$WithXdebug
 )
 
 Set-StrictMode -Version Latest
@@ -32,6 +34,14 @@ function Test-PlaceholderSecret([string]$Value) {
     return $true
   }
   return $Value -match "^change-this-"
+}
+
+function Is-True([string]$Value) {
+  if ([string]::IsNullOrWhiteSpace($Value)) {
+    return $false
+  }
+
+  return @("1", "true", "yes", "on") -contains $Value.Trim().ToLowerInvariant()
 }
 
 function Wait-HttpReady([string]$Url, [hashtable]$Headers = @{}, [int]$Attempts = 45, [int]$DelaySeconds = 2) {
@@ -72,6 +82,14 @@ $bootstrapScript = Join-Path $PSScriptRoot "bootstrap-env.ps1"
 $envPath = Join-Path $root ".env"
 $settings = Get-EnvSettings $envPath
 
+if (-not $PSBoundParameters.ContainsKey("WithMail")) {
+  $WithMail = $settings.ContainsKey("ENABLE_MAILPIT") -and (Is-True $settings["ENABLE_MAILPIT"])
+}
+
+if (-not $PSBoundParameters.ContainsKey("WithXdebug")) {
+  $WithXdebug = $settings.ContainsKey("ENABLE_XDEBUG") -and (Is-True $settings["ENABLE_XDEBUG"])
+}
+
 Write-Host ("Install Path: {0}" -f $root.Path)
 
 foreach ($secretName in @("MARIADB_ROOT_PASSWORD", "WORDPRESS_DB_PASSWORD", "WP_ADMIN_PASSWORD")) {
@@ -81,35 +99,37 @@ foreach ($secretName in @("MARIADB_ROOT_PASSWORD", "WORDPRESS_DB_PASSWORD", "WP_
 }
 
 if ($WithProxy) {
-  if ($WithTools) {
-    & (Join-Path $PSScriptRoot "hosts-sync.ps1") -WithTools -Quiet
-  }
-  else {
-    & (Join-Path $PSScriptRoot "hosts-sync.ps1") -Quiet
-  }
-
-  if ($WithTools) {
-    & (Join-Path $PSScriptRoot "proxy-sync.ps1") -WithTools
-  }
-  else {
-    & (Join-Path $PSScriptRoot "proxy-sync.ps1")
-  }
+  & (Join-Path $PSScriptRoot "hosts-sync.ps1") -WithTools:$WithTools -WithMail:$WithMail -Quiet
+  & (Join-Path $PSScriptRoot "proxy-sync.ps1") -WithTools:$WithTools -WithMail:$WithMail
   & (Join-Path $PSScriptRoot "proxy-up.ps1")
+}
+
+$composeFileArgs = @("-f", "docker-compose.yml")
+if ($WithXdebug) {
+  $composeFileArgs += @("-f", "docker-compose.xdebug.yml")
 }
 
 $profileArgs = @()
 if ($WithTools) {
   $profileArgs += @("--profile", "tools")
 }
+if ($WithMail) {
+  $profileArgs += @("--profile", "mail")
+}
 
 Push-Location $root
 try {
+  $previousEnableMailpit = $env:ENABLE_MAILPIT
+  if ($WithMail) {
+    $env:ENABLE_MAILPIT = "true"
+  }
+
   $composeArgs = @()
   if ($Detached) {
     $composeArgs += "-d"
   }
   $composeArgs += "--remove-orphans"
-  docker compose @profileArgs up @composeArgs
+  docker compose @composeFileArgs @profileArgs up @composeArgs
 
   if ($Detached) {
     $hostName = $settings["WP_HOSTNAME"]
@@ -131,9 +151,19 @@ try {
       }
     }
 
+    if ($WithMail -and $settings.ContainsKey("MAILPIT_PUBLISHED_PORT")) {
+      $mailpitDirectUrl = "http://127.0.0.1:{0}" -f $settings["MAILPIT_PUBLISHED_PORT"]
+      [void](Wait-HttpReady -Url $mailpitDirectUrl -Attempts 10)
+      if ($WithProxy) {
+        $mailpitProxyUrl = Format-ProxyUrl -HostName ("mail-{0}" -f $hostName) -Port $settings["PROXY_HTTP_PORT"]
+        [void](Wait-HttpReady -Url $mailpitProxyUrl -Attempts 10)
+      }
+    }
+
     $hostMode = if ($WithProxy) { "localhost" } else { "direct-only" }
     Write-Host ("Host Mode: {0}" -f $hostMode)
     Write-Host ("Direct URL: http://localhost:{0}" -f $wpPort)
+    Write-Host ("Xdebug: {0}" -f ($(if ($WithXdebug) { "enabled" } else { "disabled" })))
 
     if ($WithProxy) {
       Write-Host ("Proxy URL: " + $wpUrl)
@@ -146,8 +176,22 @@ try {
         Write-Host ("Adminer Proxy URL: " + (Format-ProxyUrl -HostName ("db-{0}" -f $hostName) -Port $settings["PROXY_HTTP_PORT"]))
       }
     }
+
+    if ($WithMail -and $settings.ContainsKey("MAILPIT_PUBLISHED_PORT")) {
+      $bindHost = if ($settings.ContainsKey("WORDPRESS_BIND_ADDRESS")) { $settings["WORDPRESS_BIND_ADDRESS"] } else { "127.0.0.1" }
+      Write-Host ("Mailpit URL: http://{0}:{1}" -f $bindHost, $settings["MAILPIT_PUBLISHED_PORT"])
+      if ($WithProxy) {
+        Write-Host ("Mailpit Proxy URL: " + (Format-ProxyUrl -HostName ("mail-{0}" -f $hostName) -Port $settings["PROXY_HTTP_PORT"]))
+      }
+    }
   }
 }
 finally {
+  if ($null -eq $previousEnableMailpit) {
+    Remove-Item Env:ENABLE_MAILPIT -ErrorAction SilentlyContinue
+  }
+  else {
+    $env:ENABLE_MAILPIT = $previousEnableMailpit
+  }
   Pop-Location
 }

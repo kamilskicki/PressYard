@@ -12,7 +12,7 @@ $root = Resolve-Path (Join-Path $PSScriptRoot "..")
 
 Push-Location $root
 try {
-  $args = @("--profile", "tools", "--profile", "ops", "down", "--remove-orphans")
+  $args = @("--profile", "tools", "--profile", "mail", "--profile", "ops", "down", "--remove-orphans")
   if ($Volumes) {
     $args += "-v"
   }

@@ -1,5 +1,6 @@
 param(
   [switch]$Adminer,
+  [switch]$Mailpit,
   [switch]$Direct
 )
 
