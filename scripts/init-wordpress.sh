@@ -105,12 +105,18 @@ zip_count=${#zip_files[@]}
 current_fingerprint="$(zip_fingerprint)"
 previous_fingerprint="$(cat "$ZIP_FINGERPRINT_FILE" 2>/dev/null || true)"
 
+current_permalink_structure="$(wp_cmd option get permalink_structure 2>/dev/null || true)"
+if [ "$current_permalink_structure" != "/%postname%/" ]; then
+  wp_cmd rewrite structure "/%postname%/" --hard >/dev/null
+  echo "Permalinks set to post name."
+fi
+
 if [ "$zip_count" -gt 0 ] && [ "$current_fingerprint" != "$previous_fingerprint" ]; then
   for zip in "${zip_files[@]}"; do
     echo "Processing ZIP: $(basename "$zip")"
 
-    if wp_cmd plugin install "$zip" --force >/dev/null 2>&1; then
-      echo "Installed as plugin: $(basename "$zip")"
+    if wp_cmd plugin install "$zip" --force --activate >/dev/null 2>&1; then
+      echo "Installed and activated as plugin: $(basename "$zip")"
       continue
     fi
 
