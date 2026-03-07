@@ -1,0 +1,26 @@
+.env
+.DS_Store
+Thumbs.db
+
+# Personal ZIP bundles belong in packages/ and should never be published from repo root.
+/*.zip
+
+# Keep uploads directory but ignore uploaded media by default.
+wp-content/uploads/*
+!wp-content/uploads/.gitkeep
+
+# Keep template-owned WordPress content, but ignore locally installed/generated plugins and themes.
+wp-content/plugins/*
+!wp-content/plugins/.gitkeep
+!wp-content/plugins/index.php
+wp-content/themes/*
+!wp-content/themes/.gitkeep
+!wp-content/themes/index.php
+!wp-content/themes/local-dev-theme/
+!wp-content/themes/local-dev-theme/**
+
+# Local packages and DB exports should stay out of version control by default.
+backups/*
+!backups/.gitkeep
+packages/*
+!packages/.gitkeep

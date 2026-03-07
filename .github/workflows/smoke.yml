@@ -1,0 +1,49 @@
+name: Smoke Test
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare env
+        shell: pwsh
+        run: ./scripts/bootstrap-env.ps1 -Quiet
+
+      - name: Compose config
+        run: docker compose config
+
+      - name: Boot stack
+        shell: pwsh
+        run: ./scripts/up.ps1 -WithProxy:$false
+
+      - name: Wait for site
+        shell: pwsh
+        run: |
+          $port = (Select-String -Path .env -Pattern '^WORDPRESS_PUBLISHED_PORT=').Line.Split('=')[1]
+          for ($i = 0; $i -lt 30; $i++) {
+            try {
+              $status = (Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:$port").StatusCode
+              if ($status -eq 200) { exit 0 }
+            }
+            catch {}
+            Start-Sleep -Seconds 2
+          }
+          throw "WordPress did not become ready in time."
+
+      - name: WP-CLI check
+        shell: pwsh
+        run: ./scripts/wp.ps1 core version
+
+      - name: Shutdown
+        if: always()
+        shell: pwsh
+        run: ./scripts/down.ps1 -Volumes

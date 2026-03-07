@@ -1,0 +1,34 @@
+/*
+Theme Name: PressYard Local Theme
+Theme URI: https://pressyard.local
+Author: PressYard
+Description: Branded fallback theme for PressYard local development environments.
+Version: 1.0.0
+Text Domain: local-dev-theme
+*/
+
+:root {
+  --ink: #111111;
+  --paper: #f5f0e8;
+  --accent: #db5c32;
+  --accent-2: #2e5bff;
+  --panel: #fffaf1;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at top left, rgba(219, 92, 50, 0.18), transparent 32%),
+    radial-gradient(circle at bottom right, rgba(46, 91, 255, 0.18), transparent 28%),
+    linear-gradient(160deg, #efe2d3 0%, var(--paper) 48%, #f7f3eb 100%);
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+a {
+  color: inherit;
+}
